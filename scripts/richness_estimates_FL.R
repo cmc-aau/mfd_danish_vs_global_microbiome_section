@@ -103,11 +103,14 @@ fl.asv.filt <- fl.asv %>%
 nrow(fl.asv)-nrow(fl.asv.subset) # difference of 294 species
 nrow(fl.asv)-nrow(fl.asv.filt) # difference of 9,872 species
 
+### Write metadata files to output
+data.table::fwrite(fl.asv.subset, "output/2024-05-10_MFD_FL16S_OTU_subset.csv", col.names = FALSE)
+data.table::fwrite(fl.asv.filt, "output/2024-05-10_MFD_FL16S_OTU_filtered.csv", col.names = FALSE)
 
 ### Perform random subsample without replacement
 ## Random subsample without replacement for subsetted data
 set.seed(123)
-fl.asv.filt.ra <- fl.asv.filt %>%
+fl.asv.subset.ra <- fl.asv.subset %>%
   column_to_rownames(var = "OTU") %>%
   select(where(is.numeric)) %>%
   t() %>%
@@ -118,7 +121,7 @@ fl.asv.filt.ra <- fl.asv.filt %>%
 
 ## Random subsample without replacement for filtered data
 set.seed(123)
-fl.asv.subset.ra <- fl.asv.subset %>%
+fl.asv.filt.ra <- fl.asv.filt %>%
   column_to_rownames(var = "OTU") %>%
   select(where(is.numeric)) %>%
   t() %>%
@@ -126,6 +129,7 @@ fl.asv.subset.ra <- fl.asv.subset %>%
   t() %>%
   data.frame() %>%
   filter(rowSums(across(where(is.numeric)))!=0)
+
 
 ### Reduce color palettes
 ## Pull levels from different metadata files
@@ -153,6 +157,11 @@ setdiff(levels.subset, levels)
 
 setdiff(levels, levels.filt)
 setdiff(levels.filt, levels)
+
+
+### Write metadata files to output
+data.table::fwrite(fl.asv.subset.ra, "output/2024-05-10_MFD_FL16S_OTU_subset-ra.csv", col.names = FALSE)
+data.table::fwrite(fl.asv.filt.ra, "output/2024-05-10_MFD_FL16S_OTU_filtered-ra.csv", col.names = FALSE)
 
 
 ### Estimate DK species richness
