@@ -1,6 +1,10 @@
 # mfd_danish_vs_global_microbiome_section
 This is a repo for the Danish vs global microbiome section of the MFD paper. 
 
+## Background
+The Microflora Danica full-length 16S rRNA dataset contains 21.3 million sequences representing 168,938 species-level (98.7%) OTUs. Pan-habitat rarefactions of the 16S rRNA sequences indicates that the 16S rRNA data captures Denmark’s dominant species in the investigated habitats. The taxonomic diversity measured as the number of species representatives in the Danish habitats under investigation was quantified using rarefaction (interpolation) and prediction (extrapolation) with [Hill numbers of order <em>q</em>](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1890/13-0133.1). Hill numbers, <em><sup>q</sup></em>Δ, differs by the sensitivity to the relative incidence of the species representative OTUs. The first three Hill numbers correspond to the species richness (<em>q</em> = 0), the exponential of Shannon entropy (<em>q</em> = 1), and the inverse Simpson concentration (<em>q</em> = 2), with the later two being referred to as Shannon and Simpson diversity.
+
+
 The scripts in this repository are part of the [Microflora Danica project](https://github.com/cmc-aau/mfd_wiki/wiki). 
 The scripts are used to generate maps of each category of the [MFD Ontology](https://github.com/cmc-aau/mfd_wiki/wiki/Ontology) of both 16S fragments derived from metagenomic sequencing as well as based on FL16S sequences. As a continuation of this, the repo contains scripts for mapping to the 10 and 1 km reference grid of Denmark with subsequent spatial thinning. The last script uses the 10 km representative set and produces a list of files and read patterns to extract the 16S fragments, to be used in subsequent taxonomic classification. 
 
