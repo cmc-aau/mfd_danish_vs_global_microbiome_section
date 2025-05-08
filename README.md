@@ -22,10 +22,14 @@ The generated profiles can be thought of as taxonomic bins.
 `scripts/grid_spatial_thinning.R` thins the data by mapping to the 10 and 1 km reference grids of Denmark. If more than one sample of the same MFDO1 category is present within the same grid cell, the samples with the overall highest (mean) similarity to the other samples is chosen. 
 
 
-`scripts/grid_reads_for_classification.R` uses the spatially thinned 10 km reference dataset to identify names of the corresponding sequencing files and identified 16S fragments. Then it generates a list of patterns to search for based on a file-read key, from which unambigious reads has previosly been removed. The cpmmand used was:
+`scripts/grid_reads_for_classification.R` uses the spatially thinned 10 km reference dataset to identify names of the corresponding sequencing files and identified 16S fragments. Then it generates a list of patterns to search for based on a file-read key, from which unambigious reads has previosly been removed. The command used was:
 
 
-`find /dir | grep -F -f DATE_libs-classification.txt -exec cat {} \; | grep -F -f DATE_forward-reads-classification.txt > DATE_grid-reads-for-classification.fq`
+`xargs -I {} find /dir -type f -name "{}" -print0 < DATE_MFD_libs-classification.txt | xargs -0 cat | grep -A 3 --no-group-seperator -F -f DATE_MFD_forward-reads-classification > DATE_MFD_grid-reads-for-classification.fq`
+`
+
+
+
 
 
 ## Data
