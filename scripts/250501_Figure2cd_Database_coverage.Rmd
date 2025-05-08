@@ -1,0 +1,116 @@
+---
+title: "Figure 2c+d: MFD database evaluation"
+author: "Morten K. D. Dueholm"
+date: "2025-05-01"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(patchwork)
+```
+
+## Calculate coverage
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+### Get list of bacteria and archaeal 16S rRNA reads in the MFD dataset
+subset_list <- data.table::fread("data/2024-03-07_BAC_ARC_reads_samples.txt",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+# Function for importing and arranging classifications from GPC data
+read_amp_classifications <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,4))
+  map <- setnames(map, "V1", "ASV")
+  map <- map[, Database:=gsub(".*vs_(.+).sintax", "\\1", paste(input))]
+  map <- map[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+  map <- map[, S := fifelse(S == "NA", NA_character_, S)]
+  map <- map[,  
+  .("Total" = .N,
+    "Species" = (.N-sum(is.na(S))),
+    "Genus" =   ((.N-sum(is.na(G)))),
+    "Family" = ((.N-sum(is.na(F)))),
+    "Order" = ((.N-sum(is.na(O)))),
+    "Class" = ((.N-sum(is.na(C)))),
+    "Phylum" = ((.N-sum(is.na(P))))), by=Database]
+  map <- melt(map,  measure.vars = c("Species", "Genus", "Family", "Order", "Class", "Phylum"), 
+                    variable.name = "Taxonomic_rank", 
+                    value.name = "Fraction")
+  map}
+
+# Function for importing and arranging classifications from MFD data
+read_amp_classifications2 <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,4))
+  map <- setnames(map, "V1", "ASV")
+  map <- map[, ASV := sub(" .*", "", ASV)]
+  map <- map[subset_list, on = .(ASV = V1), nomatch = 0]
+  map <- map[, Database:=gsub(".*vs_(.+).sintax", "\\1", paste(input))]
+  map <- map[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+  map <- map[, S := fifelse(S == "NA", NA_character_, S)]
+  map <- map[,  
+  .("Total" = .N,
+    "Species" = (.N-sum(is.na(S))),
+    "Genus" =   ((.N-sum(is.na(G)))),
+    "Family" = ((.N-sum(is.na(F)))),
+    "Order" = ((.N-sum(is.na(O)))),
+    "Class" = ((.N-sum(is.na(C)))),
+    "Phylum" = ((.N-sum(is.na(P))))), by=Database]
+  map <- melt(map,  measure.vars = c("Species", "Genus", "Family", "Order", "Class", "Phylum"), 
+                    variable.name = "Taxonomic_rank", 
+                    value.name = "Fraction")
+  map}
+
+# Read classifications results for all GPC_ASVs
+a <- read_amp_classifications("data/GPC_99sim_vs_GreenGenes2_2022_10_NR987.sintax")
+b <- read_amp_classifications("data/GPC_99sim_vs_GTDB_ssu_all_r220_NR987.sintax")
+c <- read_amp_classifications("data/GPC_99sim_vs_SILVA_138.1_SSURef_NR987.sintax")
+d <- read_amp_classifications("data/GPC_99sim_vs_MFD_v1.3_NR987.sintax")
+
+dt <- rbindlist(list(a,b,c,d))
+
+dt <- dt[, Taxonomic_rank:=factor(Taxonomic_rank, levels = c("Phylum", "Class", "Order", "Family", "Genus","Species"))]
+
+dt <- dt[, Database:=factor(Database, levels = c("GreenGenes2_2022_10_NR987",
+                                                 "GTDB_ssu_all_r220_NR987",
+                                                 "SILVA_138.1_SSURef_NR987",
+                                                 "MFD_v1.2_NR987"))]
+
+dt <- dt[, Percentage := round(Fraction / Total * 100, 1)]
+
+### Read classifications results for MFD reads
+# Read classifications results for all GPC_ASVs
+a2 <- read_amp_classifications2("data/GPC_mapping/2025-02-19_MFD_grid_reads_vs_GreenGenes2_2022_10_NR987.sintax")
+b2 <- read_amp_classifications2("data/2025-02-19_MFD_grid_reads_vs_GTDB_ssu_all_r220_NR987.sintax")
+c2 <- read_amp_classifications2("data/2025-02-19_MFD_grid_reads_vs_SILVA_138.1_SSURef_NR987.sintax")
+d2 <- read_amp_classifications2("data/GPC_mapping/2025-02-19_MFD_grid_reads_vs_MFG_v1.3_NR987.sintax")
+
+
+dt2 <- rbindlist(list(a2,b2,c2,d2))
+dt2 <- dt2[, Taxonomic_rank:=factor(Taxonomic_rank, levels = c("Phylum", "Class", "Order", "Family", "Genus","Species"))]
+
+dt2 <- dt2[, Database:=factor(Database, levels = c("GreenGenes2_2022_10_NR987",
+                                                 "GTDB_ssu_all_r220_NR987",
+                                                 "SILVA_138.1_SSURef_NR987",
+                                                 "MFG_v1.2_NR987"))]
+
+dt2 <- dt2[, Percentage := round(Fraction / Total * 100, 1)]
+
+```

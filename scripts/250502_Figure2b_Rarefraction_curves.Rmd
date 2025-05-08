@@ -1,0 +1,331 @@
+---
+title: "Figure 2b: Full-length 16S and 18S rarefraction"
+author: "Morten K. D. Dueholm"
+date: "2025-01-15"
+---
+  
+# Load packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(vegan)
+library(ggpubr)
+library(patchwork)
+library(wesanderson)
+library(data.table)
+```
+
+
+### Load color palette
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+metadata <- readxl::read_excel('data/2025-04-14_mfd_db.xlsx') %>%
+  select(mfd_sampletype:mfd_hab1)
+
+sample.levels <- metadata %>%
+  select(mfd_sampletype) %>%
+  filter(!is.na(mfd_sampletype)) %>%
+  distinct() %>%
+  mutate(complex = mfd_sampletype) %>%
+  arrange(mfd_sampletype) %>%
+  pull(complex)
+
+area.levels <- metadata %>%
+  select(mfd_sampletype:mfd_areatype) %>%
+  filter(!is.na(mfd_areatype)) %>%
+  distinct() %>%
+  mutate(complex = str_c(mfd_sampletype, mfd_areatype, sep = ", ")) %>%
+  arrange(mfd_sampletype, mfd_areatype) %>%
+  pull(complex)
+
+mfdo1.levels <- metadata %>%
+  select(mfd_sampletype:mfd_hab1) %>%
+  filter(!is.na(mfd_hab1)) %>%
+  # mutate(across(mfd_hab1, ~str_replace(., "Sclerophyllus scrub", "Temperate heath and scrub"))) %>%
+  distinct() %>%
+  mutate(complex = str_c(mfd_sampletype, mfd_areatype, mfd_hab1, sep = ", ")) %>%
+  arrange(mfd_sampletype, mfd_areatype, mfd_hab1) %>%
+  pull(complex)
+
+rm(metadata)
+
+## Ontology palettes
+other.palette <- colorRampPalette(c(wes_palette("Royal1")[1], wes_palette("FrenchDispatch")[3]))
+plot(rep(1, 5), col = other.palette(5), pch = 19, cex = 3)
+
+sediment.palette <- colorRampPalette(c(wes_palette("IsleofDogs2")[3], wes_palette("FantasticFox1")[1]))
+plot(rep(1, 4), col = sediment.palette(4), pch = 19, cex = 3)
+
+soil.palette <- colorRampPalette(c(wes_palette("AsteroidCity1")[4], wes_palette("AsteroidCity1")[1]))
+plot(rep(1, 14), col = soil.palette(14), pch = 19, cex = 3)
+
+water.palette <- colorRampPalette(c(wes_palette("Darjeeling2")[2], wes_palette("Zissou1")[2]))
+plot(rep(1, 5), col = water.palette(5), pch = 19, cex = 3)
+
+## Sampletype palette
+sampletype.palette <- c(other.palette(1), sediment.palette(1), soil.palette(1), water.palette(1))
+names(sampletype.palette) <- sample.levels
+
+sampletype.palette
+plot(rep(1, 4), col = sampletype.palette, pch = 19, cex = 3)
+
+## Areatype palette
+areatype.palette <- c(other.palette(1), sediment.palette(3), soil.palette(5), water.palette(3))
+names(areatype.palette) <- area.levels
+
+areatype.palette
+plot(rep(1, 12), col = areatype.palette, pch = 19, cex = 3)
+
+# MFDO1 palette
+mfdo1.palette <- c(other.palette(5), sediment.palette(4), soil.palette(14), water.palette(5))
+names(mfdo1.palette) <- mfdo1.levels
+
+mfdo1.palette
+plot(rep(1, 28), col = mfdo1.palette, pch = 19, cex = 3)
+```
+
+# Load data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+fl16s.species <- data.table::fread("output/2025-04-15_MFD_FL16S_OTU_filtered.csv", sep = ",", header = TRUE)
+setnames(fl16s.species, 1, "OTU")
+
+# Get taxonomy of eukaryotic 18S rRNA OTUs based on PR2
+Euk_tax_PR2 <- read.delim("data/MFD_euk_18S_3ndf-1510R_ASVs_clustered_99_vs_pr2_5.0.sintax",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE) %>%
+  separate(V4, into = c("k","p","c","o","f","g","s"), sep=",") %>%
+  filter(k == "k:Eukaryota") %>%
+  mutate(V1=str_replace_all(V1, "ASV", "OTU"))
+
+
+fl18s.species <- data.table::fread("data/MFD_18S_3nfd-15810R_OTUtab_MFD_only.txt", sep = "\t")
+setnames(fl18s.species, 1, "OTU")
+fl18s.species <- filter(fl18s.species, OTU %in% Euk_tax_PR2$V1)
+
+samples.fl16s <- colnames(fl16s.species) %>%
+  str_subset(., "MFD")
+
+samples.fl18s <- colnames(fl18s.species) %>%
+  str_subset(., "MFD")
+
+intersect(samples.fl16s, samples.fl18s) %>% length()
+setdiff(samples.fl16s, samples.fl18s)
+setdiff(samples.fl18s, samples.fl16s)
+
+# Summarise read counts per sample
+read.count.fl16s <- fl16s.species %>%
+  select(where(is.numeric)) %>%
+  colSums() %>%
+  data.frame("reads_16S" = .) %>%
+  rownames_to_column(var = "fieldsample_barcode")
+
+read.count.fl18s <- fl18s.species %>%
+  select(where(is.numeric)) %>%
+  colSums() %>%
+  data.frame("reads_18S" = .) %>%
+  rownames_to_column(var = "fieldsample_barcode")
+
+metadata <- readxl::read_excel('data/2025-04-14_mfd_db.xlsx') %>%
+  filter(fieldsample_barcode %in% samples.fl16s) %>%
+  select(-c(project_id, habitat_typenumber, sitename)) %>%
+  relocate(coords_reliable, .after = "longitude") %>%
+  mutate(across(mfd_hab1, ~str_replace(., "Sclerophyllous scrub", "Temperate heath and scrub")),
+         across(mfd_hab2, ~str_replace(., "Scrub", "Sclerophyllous scrub"))) %>%
+  mutate(complex = str_c(mfd_sampletype, mfd_areatype, mfd_hab1, sep = ", ")) %>%
+  left_join(read.count.fl16s) %>%
+  left_join(read.count.fl18s) %>%
+  mutate(across(reads_16S:reads_18S, ~replace_na(., 0)))
+
+# Create group summaries
+groups.summary.fl16s <- metadata %>%
+  filter(fieldsample_barcode %in% samples.fl16s) %>%
+  group_by(complex) %>%
+  summarise(size = n())
+
+groups.summary.fl18s <- metadata %>%
+  filter(fieldsample_barcode %in% samples.fl18s) %>%
+  group_by(complex) %>%
+  summarise(size = n())
+
+reads.16s.mfdo1 <- metadata %>%
+  group_by(complex) %>%
+  summarise(reads_16S = sum(reads_16S)) %>%
+  #filter(complex %in% mfdo1.subset) %>%
+  arrange(desc(reads_16S))
+
+reads.16s.total <- metadata %>%
+  group_by(complex) %>%
+  summarise(reads_16S = sum(reads_16S)) %>%
+  arrange(desc(reads_16S))
+
+reads.18s.mfdo1 <- metadata %>%
+  group_by(complex) %>%
+  summarise(reads_18S = sum(reads_18S)) %>%
+  filter(complex %in% metadata$complex) %>% #Check if this work
+  arrange(desc(reads_18S))
+
+### Rarefaction analysis
+data.fl16s.long <- fl16s.species %>%
+  select(OTU, starts_with("MFD")) %>%
+  pivot_longer(!OTU, names_to = "fieldsample_barcode", values_to = "count")
+
+data.fl18s.long <- fl18s.species %>%
+  select(OTU, starts_with("MFD")) %>%
+  pivot_longer(!OTU, names_to = "fieldsample_barcode", values_to = "count")
+
+data.fl16s.mfdo1 <- data.fl16s.long %>%
+  filter(!count == 0) %>%
+  left_join(metadata %>% select(fieldsample_barcode, complex)) %>%
+  select(-fieldsample_barcode) %>%
+  #filter(complex %in% mfdo1.subset) %>%
+  group_by(OTU, complex) %>%
+  reframe(across(count, ~sum(.))) %>%
+  group_by(OTU) %>%
+  pivot_wider(names_from = "complex", values_from = "count", values_fill = 0) %>%
+  column_to_rownames(var = "OTU") %>%
+  select(reads.16s.mfdo1 %>% pull(complex))
+
+data.fl18s.mfdo1 <- data.fl18s.long %>%
+  filter(!count == 0) %>%
+  left_join(metadata %>% select(fieldsample_barcode, complex)) %>%
+  select(-fieldsample_barcode) %>%
+  filter(complex %in% metadata$complex) %>%
+  group_by(OTU, complex) %>%
+  reframe(across(count, ~sum(.))) %>%
+  group_by(OTU) %>%
+  pivot_wider(names_from = "complex", values_from = "count", values_fill = 0) %>%
+  column_to_rownames(var = "OTU") %>%
+  select(reads.18s.mfdo1 %>% pull(complex))
+
+data.fl16s.total <- data.fl16s.long %>%
+  filter(!count == 0) %>%
+  left_join(metadata %>% select(fieldsample_barcode, complex)) %>%
+  select(-fieldsample_barcode) %>%
+  #filter(complex %in% mfdo1.subset) %>%
+  group_by(OTU, complex) %>%
+  reframe(across(count, ~sum(.))) %>%
+  group_by(OTU) %>%
+  pivot_wider(names_from = "complex", values_from = "count", values_fill = 0) %>%
+  column_to_rownames(var = "OTU") %>%
+  select(reads.16s.total %>% pull(complex)) %>%
+  mutate(total = rowSums(across(where(is.numeric))), .keep = "unused")
+
+data.fl18s.total <- data.fl18s.mfdo1 %>%
+  mutate(total = rowSums(across(where(is.numeric))), .keep = "unused")
+
+# Rarecurves
+p.total.fl16s <- rarecurve(t(data.fl16s.total), step = 10000, label = TRUE)
+names(p.total.fl16s) <- "total_reads"
+
+p.total.fl18s <- rarecurve(t(data.fl18s.total), step = 10000, label = TRUE)
+names(p.total.fl18s) <- "total_reads"
+
+p.mfdo1.fl16s <- rarecurve(t(data.fl16s.mfdo1), step = 10000, label = TRUE)
+names(p.mfdo1.fl16s) <- reads.16s.mfdo1 %>% pull(complex)
+
+p.mfdo1.fl18s <- rarecurve(t(data.fl18s.mfdo1), step = 10000, label = TRUE)
+names(p.mfdo1.fl18s) <- reads.18s.mfdo1 %>% pull(complex)
+
+data.total.fl16s <- sapply(p.total.fl16s, '[', seq(max(sapply(p.total.fl16s, length)))) %>%
+  data.frame(., check.names = FALSE) %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(across(sample, ~str_remove(., "N")),
+         across(sample, ~as.numeric(.))) %>%
+  pivot_longer(!sample, names_to = "complex", values_to = "Species_representatives")
+
+data.total.fl18s <- sapply(p.total.fl18s, '[', seq(max(sapply(p.total.fl18s, length)))) %>%
+  data.frame(., check.names = FALSE) %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(across(sample, ~str_remove(., "N")),
+         across(sample, ~as.numeric(.))) %>%
+  pivot_longer(!sample, names_to = "complex", values_to = "Species_representatives")
+
+data.mfdo1.fl16s <- sapply(p.mfdo1.fl16s, '[', seq(max(sapply(p.mfdo1.fl16s, length)))) %>%
+  data.frame(., check.names = FALSE) %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(across(sample, ~str_remove(., "N")),
+         across(sample, ~as.numeric(.))) %>%
+  pivot_longer(!sample, names_to = "complex", values_to = "Species_representatives")
+
+data.mfdo1.fl18s <- sapply(p.mfdo1.fl18s, '[', seq(max(sapply(p.mfdo1.fl18s, length)))) %>%
+  data.frame(., check.names = FALSE) %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(across(sample, ~str_remove(., "N")),
+         across(sample, ~as.numeric(.))) %>%
+  pivot_longer(!sample, names_to = "complex", values_to = "Species_representatives")
+
+# Generate rarecurve plots
+p.total.fl16s <- data.total.fl16s %>%
+  ggplot(aes(x = sample/1E06, y = Species_representatives)) +
+  geom_line(linewidth = 1, alpha = 1) +
+  scale_color_manual(values = mfdo1.palette) +
+  # scale_y_continuous(limits = c(0, 11000)) +
+  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, alpha = 1))) +
+  scale_y_continuous(limits = c(0, 120000), breaks = seq(0, 120000, 20000)) +
+  scale_x_continuous(limits = c(0, 6), breaks = seq(0, 6, 1)) +
+  ggtitle('Bacteria') +
+  xlab('Sequencing effort  [million reads]') +
+  ylab('18S rRNA gene OTUs clustered at 98.7%') +
+  theme_bw()
+
+p.total.fl18s <- data.total.fl18s %>%
+  ggplot(aes(x = sample/1E06, y = Species_representatives, color = complex)) +
+  geom_line(linewidth = 1, alpha = 1) +
+  scale_color_manual(values = mfdo1.palette, drop = FALSE) +
+  # scale_y_continuous(limits = c(0, 11000)) +
+  # guides(color = guide_legend(override.aes = list(shape = 22, size = 5, alpha = 1))) +
+  scale_y_continuous(limits = c(0, 10000), breaks = seq(0, 10000, 2000)) +
+  scale_x_continuous(limits = c(0, 12), breaks = seq(0, 12, 2)) +
+  ggtitle('Eukaryota') +
+  xlab('Sequencing effort  [million reads]') +
+  ylab('18S rRNA gene OTUs clustered at 99.0%') +
+  theme_bw() +
+  theme(legend.position = "right")
+
+p.mfdo1.fl16s <- data.mfdo1.fl16s %>%
+  ggplot(aes(x = sample/1E06, y = Species_representatives, color = complex)) +
+  geom_line(linewidth = 1, alpha = 1) +
+  scale_color_manual(values = mfdo1.palette, drop = FALSE) +
+  # scale_y_continuous(limits = c(0, 11000)) +
+  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, alpha = 1))) +
+  scale_y_continuous(limits = c(0, 60000), breaks = seq(0, 60000, 10000)) +
+  scale_x_continuous(limits = c(0, 2), breaks = seq(0, 2, 0.5)) +
+  ggtitle('Bacteria ~ MFDO1') +
+  xlab('') +
+  ylab('') +
+  theme_bw() +
+  theme(legend.position = "none")
+
+p.mfdo1.fl18s <- data.mfdo1.fl18s %>%
+  ggplot(aes(x = sample/1E06, y = Species_representatives, color = complex)) +
+  geom_line(linewidth = 1, alpha = 1) +
+  scale_color_manual(values = mfdo1.palette, drop = FALSE) +
+  # scale_y_continuous(limits = c(0, 11000)) +
+  guides(color = guide_legend(override.aes = list(shape = 22, size = 5, alpha = 1))) +
+  scale_y_continuous(limits = c(0, 4000), breaks = seq(0, 4000, 1000)) +
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.5)) +
+  ggtitle('Eukaryota ~ MFDO1') +
+  xlab('') +
+  ylab('') +
+  theme_bw() +
+  theme(legend.position = "right")
+
+p1 <- p.total.fl16s + p.total.fl18s
+
+p2 <- p.mfdo1.fl16s + p.mfdo1.fl18s
+
+p.fl16s <- p.total.fl16s + 
+  annotation_custom(ggplotGrob(p.mfdo1.fl16s), xmin = 5, xmax = 25, ymin = 0, ymax = 180000*0.75)
+
+p.fl18s <-  p.total.fl18s + 
+  annotation_custom(ggplotGrob(p.mfdo1.fl18s), xmin = 2.5, xmax = 12.5, ymin = 0, ymax = 14000*0.75)
+
+p3 <- p1 / p2
+
+ggsave(filename="Figure2b.pdf", plot=p3, width=10, height=6, useDingbats=FALSE, limitsize=FALSE)
+
+
+```

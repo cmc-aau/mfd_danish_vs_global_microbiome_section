@@ -1,0 +1,100 @@
+---
+title: "Figure 2a: Full-length 16S and 18S novelty"
+author: "Morten K. D. Dueholm"
+date: "2025-05-02"
+---
+
+# Load packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(Biostrings)
+```
+
+# Novelty Calculations for bacteria
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+# Get list of MFD FLASVs found in the MFG_ssu_database_v1.2_NR987_sintax.fa database
+MFD_only_16S <- readBStringSet("data/MFD_ssu_database_v1.3_NR987_sintax.fa")
+MFD_only_16S_ASVs <- as.data.frame(names(MFD_only_16S)) %>%
+  separate(1, into = c("ASV","tax"), sep=";")
+
+MFD_only_16S_ASVs_filtered <- MFD_only_16S_ASVs %>%
+  filter(!str_detect(tax, "f:Mitochondria|o:Chloroplast"))
+
+# Get bacterial mapping data
+FLASV_mapping <- read.delim("data/tax_SILVA_new2.txt",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE)
+
+df <- FLASV_mapping %>%
+  filter(V1 %in% MFD_only_16S_ASVs_filtered$ASV)
+
+Bac_Novelty_counts <- df %>% summarize(
+            "Known_species"=sum(V3>=98.7),
+            "New_species"=sum(V3<98.7)-sum(V3<94.5),
+            "New_genera"=sum(V3<94.5)-sum(V3<86.5),
+            "New_families"=sum(V3<86.5)-sum(V3<82),
+            "New_orders"=sum(V3<82)-sum(V3<78.5),
+            "New_classes"=sum(V3<78.5)-sum(V3<75),
+            "New_phyla"=sum(V3<75))
+
+Bac_Novelty_percent <- df %>% summarize(
+            "Known_species"=str_c(round(sum(V3>=98.7)/n()*100,2),"%"),
+            "New_species"=str_c(round((sum(V3<98.7)-sum(V3<94.5))/n()*100,2),"%"),
+            "New_genera"=str_c(round((sum(V3<94.5)-sum(V3<86.5))/n()*100,2),"%"),
+            "New_families"=str_c(round((sum(V3<86.5)-sum(V3<82))/n()*100,2),"%"),
+            "New_orders"=str_c(round((sum(V3<82)-sum(V3<78.5))/n()*100,2),"%"),
+            "New_classes"=str_c(round((sum(V3<78.5)-sum(V3<75))/n()*100,2),"%"),
+            "New_phyla"=str_c(round(sum(V3<75)/n()*100,2),"%"))
+
+Bac_Novelty <- rbind(Bac_Novelty_counts,Bac_Novelty_percent)
+
+write_csv(Bac_Novelty, "output/Fig2a_Sequence_novelty_bac.csv")
+```
+
+# Novelty Calculations for eukaryotes
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+# Get taxonomy of eukaryotic 18S rRNA OTUs based on PR2
+Euk_tax_PR2 <- read.delim("data/MFD_euk_18S_3ndf-1510R_ASVs_clustered_99_vs_pr2_5.0.sintax",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE) %>%
+  separate(V4, into = c("k","p","c","o","f","g","s"), sep=",") %>%
+  filter(k == "k:Eukaryota")
+
+# Get eukaryote mapping data
+Euk_mapping <- read.delim("data/MFD_euk_18S_3ndf-1510R_ASVs_clustered_99_vs_PR2.b6",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE)
+
+df2 <- Euk_mapping %>%
+  filter(V1 %in% Euk_tax_PR2$V1)
+
+Euk_Novelty_counts <- df2 %>% summarize(
+            "Known_species"=sum(V3>=99.0),
+            "New_species"=sum(V3<99.0)-sum(V3<97.0),
+            "New_genera"=sum(V3<97.0)-sum(V3<93.0),
+            "New_families"=sum(V3<93))
+
+Euk_Novelty_percent <- df2 %>% summarize(
+            "Known_species"=str_c(round(sum(V3>=99.0)/n()*100,2),"%"),
+            "New_species"=str_c(round((sum(V3<99.0)-sum(V3<97.0))/n()*100,2),"%"),
+            "New_genera"=str_c(round((sum(V3<97.0)-sum(V3<93.0))/n()*100,2),"%"),
+            "New_families"=str_c(round(sum(V3<93.0)/n()*100,2),"%"))
+
+Euk_Novelty <- rbind(Euk_Novelty_counts,Euk_Novelty_percent)
+
+write_csv(Euk_Novelty, "output/Fig2a_Sequence_novelty_euk.csv")
+```
