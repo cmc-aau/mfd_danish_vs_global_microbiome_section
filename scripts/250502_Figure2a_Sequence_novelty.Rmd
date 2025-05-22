@@ -13,7 +13,7 @@ library(Biostrings)
 # Novelty Calculations for bacteria
 ```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
-# Get list of MFD FLASVs found in the MFG_ssu_database_v1.2_NR987_sintax.fa database
+# Get list of MFD FLASVs found in the MFG_ssu_database_v1.3_NR987_sintax.fa database
 MFD_only_16S <- readBStringSet("data/MFD_ssu_database_v1.3_NR987_sintax.fa")
 MFD_only_16S_ASVs <- as.data.frame(names(MFD_only_16S)) %>%
   separate(1, into = c("ASV","tax"), sep=";")
